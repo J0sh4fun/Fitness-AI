@@ -63,6 +63,12 @@ class Squat(Exercise):
         raise_progress.add_range(HEURISTICS.AVG_KNEES, KEYPOINTS.L_KNEE, 90, 175)
         self._add_progress(raise_progress)
 
+    def _normalize_knee_angle(self, angle):
+        """Convert reflex angles to interior knee angles for stable comparisons."""
+        if angle is None:
+            return None
+        return 360.0 - angle if angle > 180 else angle
+
 # ── Helpers ───────────────────────────────────────────────────────────────
 
     def _get_active_knee_angle(self, heuristics: PoseHeuristics):
@@ -74,15 +80,8 @@ class Squat(Exercise):
         l_knee = heuristics.get_angle(HEURISTICS.LEFT_KNEE)
         r_knee = heuristics.get_angle(HEURISTICS.RIGHT_KNEE)
         
-        # Helper to normalize reflex angles (outside of the knee) 
-        # into interior angles (inside of the knee)
-        def normalize(angle):
-            if angle is None:
-                return None
-            return 360.0 - angle if angle > 180 else angle
-            
-        l_knee = normalize(l_knee)
-        r_knee = normalize(r_knee)
+        l_knee = self._normalize_knee_angle(l_knee)
+        r_knee = self._normalize_knee_angle(r_knee)
         
         if l_knee is not None and r_knee is not None:
             return (l_knee + r_knee) / 2.0
@@ -137,11 +136,11 @@ class Squat(Exercise):
         Checks if one leg is taking significantly more load/bending differently 
         than the other.
         """
-        l_knee = heuristics.get_angle(HEURISTICS.LEFT_KNEE)
-        r_knee = heuristics.get_angle(HEURISTICS.RIGHT_KNEE)
+        l_knee = self._normalize_knee_angle(heuristics.get_angle(HEURISTICS.LEFT_KNEE))
+        r_knee = self._normalize_knee_angle(heuristics.get_angle(HEURISTICS.RIGHT_KNEE))
 
-        # If both knees are visible and the difference in their angles is over 25 degrees
-        if l_knee and r_knee:
-            if abs(l_knee - r_knee) > 25:
-                return True
+        # Compare only when both knees are available.
+        # Rep counting is gated on critiques, so false positives here can suppress all reps.
+        if l_knee is not None and r_knee is not None and abs(l_knee - r_knee) > 25:
+            return True
         return False
